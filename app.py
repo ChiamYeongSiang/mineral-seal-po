@@ -62,10 +62,43 @@ def extract_line_items(po_text):
     items = [line.strip() for line in result.strip().split('\n') if line.strip()]
     return items
 
-def map_sku(description):
+def is_industrial_sealing_product(description):
     llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
     prompt = ChatPromptTemplate.from_template("""
-    You are helping match customer product descriptions to Mineral Seal Corporation's internal SKU codes.
+    Is this product description related to industrial sealing, insulating, gasket, packing, or textile materials?
+    Answer only YES or NO. Nothing else.
+    
+    Description: {description}
+    """)
+    chain = prompt | llm | StrOutputParser()
+    result = chain.invoke({"description": description})
+    return "YES" in result.upper()
+
+def is_industrial_sealing_product(description):
+    # If it looks like a SKU code, skip the industrial check
+    if "MS" in description.upper().replace(" ", "").replace("-", ""):
+        return True
+    
+    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+    prompt = ChatPromptTemplate.from_template("""
+    Is this product description related to industrial sealing, insulating, gasket, packing, or textile materials?
+    Answer only YES or NO. Nothing else.
+    
+    Description: {description}
+    """)
+    chain = prompt | llm | StrOutputParser()
+    result = chain.invoke({"description": description})
+    return "YES" in result.upper()
+
+def map_sku(description):
+    # Step 1 - Check if industrial product
+    if not is_industrial_sealing_product(description):
+        return "SKU NOT FOUND — Manual Review Required"
+    
+    # Step 2 - Match to SKU
+    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+    prompt = ChatPromptTemplate.from_template("""
+    Match this customer description to Mineral Seal Corporation's SKU codes.
     
     Customer description: {description}
     
@@ -79,12 +112,19 @@ def map_sku(description):
     MS-BP-002: Braided carbon packing (carbon fiber seal, carbon braided)
     MS-GR-075: Graphite rope packing 3/4 inch
 
-    IMPORTANT RULES:
-    1. If the customer description IS already a valid SKU code like MS-GR-050 return that SKU code directly.
-    2. If the description contains a SKU code with spaces or different formatting like MS GR 050 or ms-gr-050 normalize it and return the correct SKU code.
-    3. If the description is a product name or vague description find the closest matching SKU.
-    4. Return ONLY the SKU code nothing else.
-    5. If no match found return exactly: NOT_FOUND
+    RULES:
+    1. If description IS already a valid SKU code like MS-GR-050 return in format: MS-GR-050: Graphite rope packing
+    2. If description contains a SKU code with spaces or different formatting like MS GR 050 or ms-gr-050 or MS - GR - 050 normalize it and return in format: MS-GR-050: Graphite rope packing
+    3. If description matches a product name or vague description return the closest match in format: MS-GR-050: Graphite rope packing
+    4. STRICT SIMILARITY CHECK: Before matching ask yourself - is this description referring to the EXACT SAME product category?
+       - Graphite rope packing = rope or cord made of graphite for sealing
+       - Ceramic fiber tape = tape made of ceramic fiber for insulation  
+       - Fiberglass cloth = woven cloth made of fiberglass
+       - Braided packing = braided fiber packing material
+       - Rubber gasket is a DIFFERENT product category from all above — return NOT_FOUND
+       - Only match if you are highly confident the products serve the same function and are made of similar materials.
+       - When in doubt return NOT_FOUND
+    5. Return ONLY the SKU code and official name in the format shown. No extra words or sentences.
     """)
     chain = prompt | llm | StrOutputParser()
     result = chain.invoke({"description": description})
