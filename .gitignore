@@ -1,2 +1,8 @@
 .streamlit/
 .DS_Store
+.streamlit/
+.DS_Store
+*.pdf
+
+
+
