@@ -9,17 +9,6 @@ import tempfile
 # Your OpenAI API key
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-SKU_MAPPING = {
-    "graphite rope": "MS-GR-050",
-    "ceramic fiber tape": "MS-CF-T1",
-    "fiberglass cloth": "MS-FG-CL1",
-    "fiberglass": "MS-FG-CL1",
-    "ceramic fiber cloth": "MS-CF-CL1",
-    "braided packing": "MS-BP-001",
-    "braided carbon": "MS-BP-002",
-    "carbon packing": "MS-BP-002",
-}
-
 def extract_text_from_pdf(uploaded_file):
     from pypdf import PdfReader
     reader = PdfReader(uploaded_file)
@@ -74,11 +63,35 @@ def extract_line_items(po_text):
     return items
 
 def map_sku(description):
-    description_lower = description.lower()
-    for keyword, sku in SKU_MAPPING.items():
-        if keyword in description_lower:
-            return sku
-    return "SKU NOT FOUND — Manual Review Required"
+    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+    prompt = ChatPromptTemplate.from_template("""
+    You are helping match customer product descriptions to Mineral Seal Corporation's internal SKU codes.
+    
+    Customer description: {description}
+    
+    Available SKUs:
+    MS-GR-050: Graphite rope packing (graphite cord, graphite rope, flexible graphite)
+    MS-CF-T1: Ceramic fiber tape 1 inch
+    MS-CF-T2: Ceramic fiber tape 2 inch
+    MS-FG-CL1: Fiberglass cloth (glass fabric, woven glass, fiberglass sheet)
+    MS-CF-CL1: Ceramic fiber cloth
+    MS-BP-001: Braided packing
+    MS-BP-002: Braided carbon packing (carbon fiber seal, carbon braided)
+    MS-GR-075: Graphite rope packing 3/4 inch
+
+    IMPORTANT RULES:
+    1. If the customer description IS already a valid SKU code like MS-GR-050 return that SKU code directly.
+    2. If the description contains a SKU code with spaces or different formatting like MS GR 050 or ms-gr-050 normalize it and return the correct SKU code.
+    3. If the description is a product name or vague description find the closest matching SKU.
+    4. Return ONLY the SKU code nothing else.
+    5. If no match found return exactly: NOT_FOUND
+    """)
+    chain = prompt | llm | StrOutputParser()
+    result = chain.invoke({"description": description})
+    
+    if "NOT_FOUND" in result:
+        return "SKU NOT FOUND — Manual Review Required"
+    return result.strip()
 
 def validate_po(extracted_text, customer_name):
     issues = []
