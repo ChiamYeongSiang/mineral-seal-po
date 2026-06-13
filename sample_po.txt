@@ -1,0 +1,15 @@
+PURCHASE ORDER
+
+Customer: ABC Manufacturing Co.
+PO Number: PO-2026-001
+Date: June 12, 2026
+Ship To: 123 Industrial Ave, Houston TX 77001
+
+Line Items:
+1. Graphite rope packing, 1/2 inch diameter - Qty: 50 feet - Unit Price: $8.50
+2. Ceramic fiber tape, 1 inch wide - Qty: 100 feet - Unit Price: $5.00
+3. Fiberglass cloth - Qty: 20 sq ft - Unit Price: $12.00
+
+Shipping Method: FedEx Ground
+Payment Terms: Net 30
+Special Instructions: Please double wrap packaging
